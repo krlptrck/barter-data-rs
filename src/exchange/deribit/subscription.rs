@@ -1,23 +1,5 @@
 use barter_integration::{Validator, error::SocketError};
-use serde::{Deserialize, Serialize, Serializer};
-
-use crate::exchange::subscription::ExchangeSub;
-
-use super::{channel::DeribitChannel, market::DeribitMarket};
-
-// Implement custom Serialize to assist aesthetics of <Deribit as Connector>::requests() function.
-impl Serialize for ExchangeSub<DeribitChannel, DeribitMarket> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let combined = format!("{}.{}", self.channel.as_ref(), self.market.as_ref());
-        serializer.serialize_str(&combined)
-
-        // let combined = format!("{}.{}", self.channel.as_ref(), self.market.as_ref());
-        // serializer.serialize_str(&self.channel.as_ref()) // assuming all channel elements are already provided and formatted
-    }
-}
+use serde::{Deserialize, Serialize};
 
 /// [`Deribit`](super::Deribit) WebSocket subscription response.
 ///

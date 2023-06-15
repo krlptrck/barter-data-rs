@@ -1,19 +1,16 @@
 use crate::{
     event::{MarketEvent, MarketIter},
-    exchange::{ExchangeId},
-    subscription::trade::PublicTrade
+    exchange::{ExchangeId, subscription::ExchangeSub},
+    subscription::trade::PublicTrade, Identifier
 };
-use barter_integration::model::{instrument::Instrument, Exchange, Side};
-use chrono::{DateTime, Utc, TimeZone};
+use barter_integration::model::{instrument::Instrument, Exchange, Side, SubscriptionId};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::notification::DeribitMessageMultiple;
-
-
-
+use super::{message::{DeribitMultipleDataMessage}, channel::DeribitChannel};
 
 /// Terse type alias for an [`Deribit`](super::Deribit) real-time trades WebSocket message.
-pub type DeribitTrades = DeribitMessageMultiple<DeribitTrade>;
+pub type DeribitTrades = DeribitMultipleDataMessage<DeribitTrade>;
 
 // {
 //     "params" : {
@@ -55,11 +52,20 @@ pub struct DeribitTrade {
     #[serde(rename = "direction")]
     pub side: Side,
 
-    // #[serde(
-    //     rename = "timestamp",
-    //     deserialize_with = "deserialize_timestamp"
-    // )]
-    // pub time: DateTime<Utc>,
+    pub instrument_name: String,
+
+    #[serde(
+        alias = "timestamp",
+        deserialize_with = "barter_integration::de::de_u64_epoch_ms_as_datetime_utc"
+    )]
+    pub time: DateTime<Utc>,
+}
+
+
+impl Identifier<Option<SubscriptionId>> for DeribitTrades {
+    fn id(&self) -> Option<SubscriptionId> {
+        Some(ExchangeSub::from((DeribitChannel::TRADES_RAW, &self.params.data[0].instrument_name)).id())
+    }
 }
 
 
@@ -70,7 +76,7 @@ impl From<(ExchangeId, Instrument, DeribitTrades)> for MarketIter<PublicTrade> {
             .into_iter()
             .map(|trade| {
                 Ok(MarketEvent { 
-                    exchange_time: Utc::now(), 
+                    exchange_time: trade.time, 
                     received_time: Utc::now(), 
                     exchange: Exchange::from(exchange_id), 
                     instrument: instrument.clone(), 
@@ -84,15 +90,4 @@ impl From<(ExchangeId, Instrument, DeribitTrades)> for MarketIter<PublicTrade> {
             })
             .collect()
     }
-}
-
-fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let timestamp_ms: u64 = serde::Deserialize::deserialize(deserializer)?;
-    let timestamp_sec = timestamp_ms / 1000;
-    let timestamp_subsec = ((timestamp_ms % 1000) * 1_000_000) as u32;
-    let timestamp_utc = Utc.timestamp(timestamp_sec as i64, timestamp_subsec);
-    Ok(timestamp_utc)
 }

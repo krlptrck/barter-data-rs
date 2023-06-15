@@ -7,12 +7,12 @@ use serde_json::json;
 use crate::{
     exchange::{Connector, ExchangeId, ExchangeSub, PingInterval, StreamSelector},
     subscriber::{validator::WebSocketSubValidator, WebSocketSubscriber},
-    subscription::{trade::PublicTrades, book::OrderBooksL1},
-    transformer::stateless::StatelessTransformer,
+    subscription::{trade::PublicTrades, book::{OrderBooksL1, OrderBooksL2}},
+    transformer::{stateless::StatelessTransformer, book::MultiBookTransformer},
     ExchangeWsStream,
 };
 
-use self::{channel::DeribitChannel, market::DeribitMarket, subscription::{DeribitSubResponse}, trade::DeribitTrades, book::l1::DeribitOrderBookL1};
+use self::{channel::DeribitChannel, market::DeribitMarket, subscription::{DeribitSubResponse}, trade::DeribitTrades, book::{l1::DeribitOrderBookL1, l2::DeribitBookUpdater}};
 
 pub mod channel;
 
@@ -20,7 +20,7 @@ pub mod market;
 
 pub mod subscription;
 
-pub mod notification;
+pub mod message;
 
 pub mod trade;
 
@@ -67,20 +67,9 @@ impl Connector for Deribit {
     }
 
     fn requests(exchange_subs: Vec<ExchangeSub<Self::Channel, Self::Market>>) -> Vec<WsMessage> {
-
         let stream_names = exchange_subs
             .into_iter()
-            .map(|sub| {
-                match sub.channel {
-                    DeribitChannel::TRADES_RAW => {
-                        format!("trades.{}.raw", sub.market.as_ref())
-                    },
-                    DeribitChannel::ORDER_BOOK_L1 => {
-                        format!("quote.{}", sub.market.as_ref())
-                    },
-                    DeribitChannel(&_) => todo!()
-                }
-            })
+            .map(|sub| format!("{}", sub.channel.as_ref().replace("{}", sub.market.as_ref())))
             .collect::<Vec<String>>();
 
         vec![WsMessage::Text(
@@ -104,5 +93,8 @@ impl StreamSelector<OrderBooksL1> for Deribit {
     type Stream = ExchangeWsStream<StatelessTransformer<Self, OrderBooksL1, DeribitOrderBookL1>>;
 }
 
-
+impl StreamSelector<OrderBooksL2> for Deribit {
+    type Stream =
+        ExchangeWsStream<MultiBookTransformer<Self, OrderBooksL2, DeribitBookUpdater>>;
+}
 
