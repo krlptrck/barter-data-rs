@@ -37,8 +37,14 @@ use serde::{Deserialize, Serialize};
 pub struct DeribitSubResponse {
     pub jsonrpc: String,
     pub id: Option<i32>,
-    pub result: Vec<String>,
-    //TODO: add error object
+    pub result: Option<Vec<String>>,
+    pub error: Option<DeribitError>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
+pub struct DeribitError {
+    pub code: i64,
+    pub message: String,
 }
 
 impl Validator for DeribitSubResponse {
@@ -46,11 +52,12 @@ impl Validator for DeribitSubResponse {
     where
         Self: Sized,
     {
-
-        //TODO: check for error variant
-
-        match self.result.len() {
-            0 => Err(SocketError::Subscribe(format!("received empty subscription response"))),
+        match (self.error.as_ref(), self.result.as_ref().map(Vec::len)) {
+            (Some(e), _) => Err(SocketError::Subscribe(format!(
+                "Received failure subscription response code: {} with message: {}",
+                e.code, e.message,
+            ))),
+            (_, Some(0)) | (None, None) => Err(SocketError::Subscribe("Received empty subscription response".to_string())),
             _ => Ok(self),
         }
     }
