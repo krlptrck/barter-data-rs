@@ -59,11 +59,10 @@ impl Connector for Deribit {
     }
 
     fn ping_interval() -> Option<super::PingInterval> {
-        // Some(PingInterval {
-        //     interval: tokio::time::interval(PING_INTERVAL_DERIBIT),
-        //     ping: || WsMessage::text("ping"), // TODO: public/test
-        // })
-        None
+        Some(PingInterval {
+            interval: tokio::time::interval(PING_INTERVAL_DERIBIT),
+            ping: || WsMessage::text("ping"),
+        })
     }
 
     fn requests(exchange_subs: Vec<ExchangeSub<Self::Channel, Self::Market>>) -> Vec<WsMessage> {

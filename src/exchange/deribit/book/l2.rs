@@ -1,9 +1,8 @@
 use barter_integration::{
-    error::SocketError,
     model::{instrument::Instrument, Side, SubscriptionId},
     protocol::websocket::WsMessage,
 };
-use chrono::{Utc, DateTime};
+use chrono::{Utc};
 use tokio::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
@@ -18,7 +17,7 @@ pub type DeribitOrderBookL2 = DeribitSingleDataMessage<DeribitOrderBookL2Delta>;
 #[derive(Clone, PartialEq, PartialOrd, Debug, Deserialize, Serialize)]
 pub struct DeribitOrderBookL2Delta {
     pub instrument_name: String,
-    pub change_id: Option<u64>,
+    pub change_id: u64,
     pub prev_change_id: Option<u64>,
     pub bids: Vec<DeribitLevel>,
     pub asks: Vec<DeribitLevel>
@@ -52,11 +51,6 @@ impl From<DeribitOrderBookL2Delta> for OrderBook {
 // If prev_change_id is equal to the change_id of the previous message, this means that no messages have been missed.
 
 // The amount for perpetual and futures is in USD units, for options it is in corresponding cryptocurrency contracts, e.g., BTC or ETH.
-
-
-// Step 1: Update full snapshot from first notification
-
-
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
 pub struct DeribitBookUpdater {
@@ -95,7 +89,7 @@ impl OrderBookUpdater for DeribitBookUpdater{
             updater: Self::new(0),
             book: OrderBook::from(DeribitOrderBookL2Delta {
                 instrument_name: String::new(),
-                change_id: Some(0),
+                change_id: 0,
                 prev_change_id: Some(0),
                 bids: Vec::new(),
                 asks: Vec::new(),
@@ -108,26 +102,21 @@ impl OrderBookUpdater for DeribitBookUpdater{
         book: &mut Self::OrderBook,
         update: Self::Update,
     ) -> Result<Option<Self::OrderBook>, DataError> {
-        // BinanceSpot: How To Manage A Local OrderBook Correctly
-        // See Self's Rust Docs for more information on each numbered step
-        // See docs: <https://binance-docs.github.io/apidocs/spot/en/#how-to-manage-a-local-order-book-correctly>
 
-        // 4. Drop any event where u is <= lastUpdateId in the snapshot:
-        // if update.last_update_id <= self.last_update_id {
-        //     return Ok(None);
-        // }
+        // If prev_change_id is equal to the change_id of the previous message, this means that no messages have been missed.
+        match update.params.data.prev_change_id {
+            Some(prev_change_id) if prev_change_id != self.change_id => {
+                return Err(DataError::InvalidSequence {
+                    prev_last_update_id: self.prev_change_id,
+                    first_update_id: update.params.data.change_id,
+                })
+            }
+            _ => {}
+        }
 
-        // if self.is_first_update() {
-        //     // 5. The first processed event should have U <= lastUpdateId AND u >= lastUpdateId:
-        //     self.validate_first_update(&update)?;
-        // } else {
-        //     // 6. Each new event's pu should be equal to the previous event's u:
-        //     self.validate_next_update(&update)?;
-        // }
-
-        // // Update OrderBook metadata & Levels:
-        // // 7. The data in each event is the absolute quantity for a price level.
-        // // 8. If the quantity is 0, remove the price level.
+        // Update OrderBook metadata & Levels:
+        // 7. The data in each event is the absolute quantity for a price level.
+        // 8. If the quantity is 0, remove the price level.
         book.last_update_time = Utc::now();
         book.bids.upsert(update.params.data.bids);
         book.asks.upsert(update.params.data.asks);
@@ -135,7 +124,7 @@ impl OrderBookUpdater for DeribitBookUpdater{
         // // Update OrderBookUpdater metadata
         self.updates_processed += 1;
         self.prev_change_id = self.change_id;
-        self.change_id = update.params.data.change_id.unwrap();
+        self.change_id = update.params.data.change_id;
 
         Ok(Some(book.snapshot()))
     }
