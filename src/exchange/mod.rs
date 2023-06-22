@@ -44,6 +44,8 @@ pub mod okx;
 
 pub mod deribit;
 
+pub mod aevo;
+
 /// Defines the generic [`ExchangeSub`] containing a market and channel combination used by an
 /// exchange [`Connector`] to build [`WsMessage`] subscription payloads.
 pub mod subscription;
@@ -188,6 +190,7 @@ pub enum ExchangeId {
     Kraken,
     Okx,
     Deribit,
+    Aevo
 }
 
 impl From<ExchangeId> for barter_integration::model::Exchange {
@@ -222,6 +225,7 @@ impl ExchangeId {
             ExchangeId::Kraken => "kraken",
             ExchangeId::Okx => "okx",
             ExchangeId::Deribit => "deribit",
+            ExchangeId::Aevo => "aevo",
         }
     }
 
@@ -236,7 +240,7 @@ impl ExchangeId {
             // Spot
             (
                 BinanceFuturesUsd | Bitmex | BybitPerpetualsUsd | GateioPerpetualsUsd
-                | GateioPerpetualsBtc,
+                | GateioPerpetualsBtc | Aevo,
                 Spot,
             ) => false,
             (_, Spot) => true,
@@ -254,7 +258,7 @@ impl ExchangeId {
             (_, Perpetual) => false,
 
             // Option
-            (GateioOptions | Okx | Deribit, Option(_)) => true,
+            (GateioOptions | Okx | Deribit | Aevo, Option(_)) => true,
             (_, Option(_)) => false,
         }
     }
