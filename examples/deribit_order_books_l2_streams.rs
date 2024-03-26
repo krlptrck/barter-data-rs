@@ -38,7 +38,7 @@ async fn main() {
         .unwrap();
 
     while let Some(order_book_l2) = binance_stream.recv().await {
-        info!("{:?}", order_book_l2.kind.mid_price());
+        info!("{:?}", order_book_l2);
     }
 }
 

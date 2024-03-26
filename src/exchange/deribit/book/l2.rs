@@ -129,3 +129,96 @@ impl OrderBookUpdater for DeribitBookUpdater{
         Ok(Some(book.snapshot()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod de {
+        use crate::exchange::{deribit::{message::{SubscriptionMethod, SingleData}, book::Delta}, aevo::channel};
+
+        use super::*;
+
+        #[test]
+        fn test_deribit_order_book_l2_delta() {
+            let json = r#"{
+                "params" : {
+                  "data" : {
+                    "type" : "snapshot",
+                    "timestamp" : 1554373962454,
+                    "instrument_name" : "BTC-PERPETUAL",
+                    "change_id" : 297217,
+                    "bids" : [
+                      [
+                        "new",
+                        5042.34,
+                        30
+                      ],
+                      [
+                        "new",
+                        5041.94,
+                        20
+                      ]
+                    ],
+                    "asks" : [
+                      [
+                        "new",
+                        5042.64,
+                        40
+                      ],
+                      [
+                        "new",
+                        5043.3,
+                        40
+                      ]
+                    ]
+                  },
+                  "channel" : "book.BTC-PERPETUAL.raw"
+                },
+                "method" : "subscription",
+                "jsonrpc" : "2.0"
+              }"#;
+
+            assert_eq!(
+                serde_json::from_str::<DeribitOrderBookL2>(json).unwrap(),
+                DeribitOrderBookL2 {
+                    jsonrpc: "2.0".to_string(),
+                    method: SubscriptionMethod::Subscription,
+                    params: SingleData { 
+                        data: DeribitOrderBookL2Delta {
+                            instrument_name: "BTC-PERPETUAL".to_string(),
+                            change_id: 297217,
+                            prev_change_id: None,
+                            bids: vec![
+                                DeribitLevel (Delta::New, 5042.34, 30.0),
+                                DeribitLevel (Delta::New, 5041.94, 20.0),    
+                            ],
+                            asks: vec![
+                                DeribitLevel (Delta::New, 5042.64, 40.0),
+                                DeribitLevel (Delta::New, 5043.3, 40.0),  
+                            ], 
+                            },
+                        channel: "book.BTC-PERPETUAL.raw".to_string(),
+                    }
+                }
+            );
+        }
+    }
+
+
+    mod deribit_book_updater {
+        use super::*;
+        use crate::subscription::book::{Level, OrderBookSide};
+        use barter_integration::model::Side;
+
+        #[test]
+        fn test_is_first_update() {}
+
+
+        #[test]
+        fn test_validate_next_update() {}
+
+        #[test]
+        fn update() {}
+    }
+}
